@@ -110,7 +110,7 @@ def main():
     adjusted_slow_growth_duration = slow_growth_duration + 2
 
     # Load the data
-    data_path = '/Users/alexkesin/adjusted_spending_data.csv'
+    data = pd.read_csv('adjusted_spending_data.csv')
     spending_data = pd.read_csv(data_path)
 
     # Calculate the mean of each column (condition)
