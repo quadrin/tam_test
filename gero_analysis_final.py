@@ -62,7 +62,7 @@ def adoption_multiplier(t, max_rate, peak_time):
 
     return max(0, adopt_mult)  # Ensure that the adoption multiplier is not less than 0
 
-def calculate_spending(start_year, year, state, condition, adjusted_peak_time, adjusted_slow_growth_duration, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
+def calculate_spending(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
     year_since = year - start_year
     
     # Get the spending data for the given condition across all states
@@ -99,7 +99,7 @@ def calculate_spending(start_year, year, state, condition, adjusted_peak_time, a
 
     return total_savings
 
-def calculate_spending_without_multiplier(start_year, year, state, condition, adjusted_peak_time, adjusted_slow_growth_duration, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
+def calculate_spending_without_multiplier(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
     year_since = year - start_year
     
     # Get the spending data for the given state and condition
@@ -157,8 +157,8 @@ def main():
     with sliders_col:
         plot_size = st.slider('Plot Size', min_value=0.1, max_value=15.0, value=5.0, key='plot_size')
         plot_total = st.checkbox('Plot Total Spending', value=True, key='plot_total')
-        diseases = st.multiselect('Diseases', options=list_of_diseases, default=list_of_diseases, key='diseases')
-        reduction_rate = st.number_input('Spending Reduction Rate (for payers)', min_value=0.0, max_value=1.0, value=0.2, key='reduction_rate')
+        diseases = st.multiselect('Diseases with Reduced Spending Burden', options=list_of_diseases, default=list_of_diseases, key='diseases')
+        reduction_rate = st.number_input('Spending Reduction Rate for All Disease (for payers)', min_value=0.0, max_value=1.0, value=0.2, key='reduction_rate')
         consumer_percentage = st.slider('Consumer Revenue as Percentage of Total Revenue', min_value=0.0, max_value=1.0, value=0.5, key='percentage')
         spending_percentage = 1 - consumer_percentage
         list_price = st.number_input('Consumer Aging Drug List Price ($)', min_value=0, value=618, key='list_price')
@@ -166,11 +166,10 @@ def main():
         total_older_adults = st.number_input('Total Older Adults', min_value=0, value=55000000, key='total_older_adults')
         discount = st.number_input('Discount for Payers (Medicare/PBMs)', min_value=0.0, max_value=1.0, value=0.55, key='discount')
         discounts = {'PBMs': discount}
-        patent_duration = st.slider('Years of Patent Duration', min_value=0, max_value=30, value=15, key='patent_duration')
+        patent_duration = st.slider('Years of Patent Exclusivity', min_value=0, max_value=30, value=15, key='patent_duration')
         annual_inflation = st.slider('Annual Inflation Rate', min_value=0.0, max_value=0.1, value=0.025, key='annual_inflation')
         start_year = st.slider('Start Year', min_value=2023, max_value=2050, value=2030, key='start_year')
         peak_time = st.slider('Years Until Peak Revenue', min_value=0, max_value=10, value=5, key='peak_time')
-        slow_growth_duration = st.slider('Years under Slow Adoption Period', min_value=0, max_value=10, value=5, key='slow_growth_duration')
 
     # Define extended_years here, after the sliders
     end_year = start_year + patent_duration
@@ -178,7 +177,6 @@ def main():
 
     # Adjusted parameters
     adjusted_peak_time = peak_time 
-    adjusted_slow_growth_duration = slow_growth_duration 
 
     # Load the data
     data_path = '/Users/alexkesin/adjusted_spending_data.csv'
@@ -220,7 +218,7 @@ def main():
         yearly_spending = 0
         for state in spending_data['State']:
             for condition in diseases:
-                spending = calculate_spending(start_year, year, state, condition, adjusted_peak_time, adjusted_slow_growth_duration, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
+                spending = calculate_spending(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
                 yearly_spending += spending
         total_spendings.append(yearly_spending)
 
@@ -231,28 +229,32 @@ def main():
         total_combined_revenue.append(total_revenue)
     
     # Create a color map
-    color_map = {disease: color for disease, color in zip(list_of_diseases, sns.color_palette("hls", len(list_of_diseases)))}
+    color_map = {disease: color for disease, color in zip(list_of_diseases, sns.color_palette("Set2", len(list_of_diseases)))}  # Use the "husl" color palette
 
     # Set the style of the plots
-    sns.set_theme()
+    sns.set_theme(style="whitegrid")  # Use whitegrid style for better gridlines
+
+    sns.set(font_scale=1.2)
+
+    sns.set_style("whitegrid", {'axes.grid' : True})
 
     # Plot the final consumer revenue
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7.5))  # Use a fixed size for the plot
     rev_in_billion = [r / 1e9 for r in final_consumer_revenue]  # Convert revenue to billions
-    ax1.plot(extended_years, rev_in_billion, color='blue')  # Removed label argument
-    ax2.plot(extended_years, rev_in_billion, color='blue')  # Removed label argument
+    ax1.plot(extended_years, rev_in_billion, color='blue', linewidth=4)  # Adjusted linewidth
+    ax2.plot(extended_years, rev_in_billion, color='blue', linewidth=4)  # Adjusted linewidth
 
-    ax1.set_title('Consumer Revenue Over Time for An Aging Drug (Log Scale)', fontsize=20)
-    ax1.set_xlabel('Year', fontsize=15)
-    ax1.set_ylabel('Revenue ($ billions)', fontsize=15)  # Adjust y-axis label
+    ax1.set_title('Consumer Revenue Over Time for An Aging Drug (Log Scale)', fontsize=22)
+    ax1.set_xlabel('Year', fontsize=18)
+    ax1.set_ylabel('Revenue ($ billions)', fontsize=18)  # Adjust y-axis label
     ax1.set_yscale('log')  # Make y-axis logarithmic
-    ax1.legend(prop={'size': 6}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Move legend to the right
+    ax1.legend(prop={'size': 12}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Adjusted legend size
     ax1.grid(True)
 
-    ax2.set_title('Consumer Revenue Over Time for An Aging Drug (Normal Scale)', fontsize=20)
-    ax2.set_xlabel('Year', fontsize=15)
-    ax2.set_ylabel('Revenue ($ billions)', fontsize=15)  # Adjust y-axis label
-    ax2.legend(prop={'size': 6}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Move legend to the right
+    ax2.set_title('Consumer Revenue Over Time for An Aging Drug (Normal Scale)', fontsize=22)
+    ax2.set_xlabel('Year', fontsize=18)
+    ax2.set_ylabel('Revenue ($ billions)', fontsize=18)  # Adjust y-axis label
+    ax2.legend(prop={'size': 12}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Adjusted legend size
     ax2.grid(True)
 
     fig.tight_layout()  # Adjust the layout of the plot
@@ -271,25 +273,26 @@ def main():
         for year in extended_years:
             yearly_spending = 0
             for state in spending_data['State']:
-                spending = calculate_spending(start_year, year, state, condition, adjusted_peak_time, adjusted_slow_growth_duration, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
+                spending = calculate_spending(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
                 yearly_spending += spending
             individual_spendings.append(yearly_spending / 1e9)  # Convert to billions
-        ax1.plot(extended_years, individual_spendings, label=f'Condition: {condition}')
+        # In your plot functions, use the linewidth parameter to set the thickness of the lines
+        ax1.plot(extended_years, individual_spendings, label=f'Condition: {condition}', color=color_map[condition], linewidth=4)
 
-    ax1.set_title('Individual Medicare Spending Over Time for An Aging Drug', fontsize=20)
-    ax1.set_xlabel('Year', fontsize=15)
-    ax1.set_ylabel('Individual Spending ($ billions)', fontsize=15)
-    ax1.legend(loc='upper left')
+    ax1.set_title('Individual Medicare Spending Over Time for An Aging Drug', fontsize=22)
+    ax1.set_xlabel('Year', fontsize=18)
+    ax1.set_ylabel('Individual Spending ($ billions)', fontsize=18)
+    ax1.legend(loc='upper left', fontsize=12)
     ax1.grid(True)
 
     # Plot total spending on the second subplot
-    total_spendings = [spending / 1e9 for spending in total_spendings]
-    ax2.plot(extended_years, total_spendings, label='Total Disease Spending', color='black', linestyle='--')
-    ax2.set_title('Total Medicare Spending Over Time for An Aging Drug', fontsize=20)
-    ax2.set_xlabel('Year', fontsize=15)
-    ax2.set_ylabel('Total Spending ($ billions)', fontsize=15)
-    ax2.legend(loc='upper left')
-    ax2.grid(True)
+    total_spendings = [spending / 1e9 for spending in total_spendings]  # Convert to billions
+    ax2.plot(extended_years, total_spendings, label='Total Disease Spending', color='black', linestyle='--', linewidth=4)  # Adjusted linewidth
+    ax2.set_title('Total Medicare Spending Over Time for An Aging Drug', fontsize=22)  # Adjusted fontsize
+    ax2.set_xlabel('Year', fontsize=18)  # Adjusted fontsize
+    ax2.set_ylabel('Total Spending ($ billions)', fontsize=18)  # Adjusted fontsize
+    ax2.legend(loc='upper left', fontsize=12)  # Adjusted fontsize
+    ax2.grid(True)  # Enabled grid
 
     plt.tight_layout()
     plt.show()
@@ -299,27 +302,27 @@ def main():
     buf.seek(0)
     plots_col.markdown(plot_to_html(fig, plot_size), unsafe_allow_html=True)
 
-    # Create a combined revenue figure with two subplots side by side
+   # Create a combined revenue figure with two subplots side by side
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7.5))  # Use a fixed size for the plot
-    
+
     # Plot the combined revenue on the first subplot (logarithmic scale)
-    ax1.set_title('Total Revenue Over Time for An Aging Drug (Log Scale)', fontsize=20)
-    ax1.set_xlabel('Year', fontsize=15)
-    ax1.set_ylabel('Revenue ($ billions)', fontsize=15)  # Adjust y-axis label
+    ax1.set_title('Total Revenue Over Time for An Aging Drug (Log Scale)', fontsize=22)
+    ax1.set_xlabel('Year', fontsize=18)
+    ax1.set_ylabel('Revenue ($ billions)', fontsize=18)  # Adjust y-axis label
     ax1.set_yscale('log')  # Make y-axis logarithmic
-    ax1.legend(prop={'size': 6}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Move legend to the right
+    ax1.legend(prop={'size': 12}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Adjusted legend size
     ax1.grid(True)
 
     if plot_total:
         total_combined_rev_in_billion = [r / 1e9 for r in total_combined_revenue]  # Convert total combined revenue to billions
-        ax1.plot(extended_years, total_combined_rev_in_billion, label='Total Combined Revenue', color='black', linestyle='--')
-        ax2.plot(extended_years, total_combined_rev_in_billion, label='Total Combined Revenue', color='black', linestyle='--')
+        ax1.plot(extended_years, total_combined_rev_in_billion, label='Total Combined Revenue', color='black', linestyle='--', linewidth=4)
+        ax2.plot(extended_years, total_combined_rev_in_billion, label='Total Combined Revenue', color='black', linestyle='--', linewidth=4)
 
     # Plot the combined revenue on the second subplot (normal scale)
-    ax2.set_title('Total Revenue Over Time for An Aging Drug (Normal Scale)', fontsize=20)
-    ax2.set_xlabel('Year', fontsize=15)
-    ax2.set_ylabel('Revenue ($ billions)', fontsize=15)  # Adjust y-axis label
-    ax2.legend(prop={'size': 6}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Move legend to the right
+    ax2.set_title('Total Revenue Over Time for An Aging Drug (Normal Scale)', fontsize=22)
+    ax2.set_xlabel('Year', fontsize=18)
+    ax2.set_ylabel('Revenue ($ billions)', fontsize=18)  # Adjust y-axis label
+    ax2.legend(prop={'size': 12}, bbox_to_anchor=(1.05, 1), loc='upper left')  # Adjusted legend size
     ax2.grid(True)
 
     fig.tight_layout()  # Adjust the layout of the plot
