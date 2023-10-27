@@ -9,20 +9,15 @@ from PIL import Image
 import base64
 import io
 
-# Parameters
-default_total_older_adults = 55000000 # Supply the number
+# Magic numbers I set as the defaults for later
+default_total_older_adults = 55000000
 default_list_price = 618
-default_discounts = {'PBMs': 0.55 * default_list_price}
-default_penetration_rates = [0.25, 0.5, 0.75]
+default_penetration_rate = 0.25
 default_patent_duration = 15
 default_annual_inflation = 0.025
 default_start_year = 2030
 default_end_year = default_start_year + default_patent_duration
 default_peak_time = 5
-default_slow_growth_duration = 5
-
-extended_years = list(range(default_start_year, default_end_year + 1))
-market_share = {'PBMs': 1}  # Assuming 100% market share for PBMs
 
 def plot_to_html(fig, plot_size):
     buf = io.BytesIO()
@@ -62,7 +57,7 @@ def adoption_multiplier(t, max_rate, peak_time):
 
     return max(0, adopt_mult)  # Ensure that the adoption multiplier is not less than 0
 
-def calculate_spending(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
+def calculate_spending(start_year, year, state, condition, peak_time, reduction_rate, total_older_adults, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
     year_since = year - start_year
     
     # Get the spending data for the given condition across all states
@@ -75,7 +70,7 @@ def calculate_spending(start_year, year, state, condition, adjusted_peak_time, r
     penetration_rate = reduction_to_penetration(reduction_rate)
 
     # Calculate the adoption multiplier for the given year
-    adopt_mult = adoption_multiplier(year_since, penetration_rate, adjusted_peak_time)
+    adopt_mult = adoption_multiplier(year_since, penetration_rate, peak_time)
 
     # Calculate the new spending based on the adjusted original spending, adoption multiplier, and penetration rate
     new_spending = original_spending * (1 - adopt_mult)
@@ -99,48 +94,21 @@ def calculate_spending(start_year, year, state, condition, adjusted_peak_time, r
 
     return total_savings
 
-def calculate_spending_without_multiplier(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data):     
-    year_since = year - start_year
-    
-    # Get the spending data for the given state and condition
-    original_spending = spending_data.loc[spending_data['State'] == state, condition].values[0]
-
-    # Get the population data for the given state and condition
-    population = population_data.loc[population_data['State'] == state, condition].values[0]
-
-    # Convert reduction_rate to penetration_rate using a logistic function
-    penetration_rate = reduction_to_penetration(reduction_rate)
-
-    # Calculate the new spending based on the adjusted original spending, adoption multiplier, and penetration rate
-    new_spending = original_spending * (1 - penetration_rate)
-
-    # Adjust for inflation
-    inflation_adjustment = (1 + annual_inflation) ** (year - start_year)
-    new_spending /= inflation_adjustment
-
-    original_spending /= inflation_adjustment
-
-    # Calculate the savings for the current year
-    savings = original_spending - new_spending
-
-    # Calculate the savings per person
-    savings_per_person = savings / population
-
-    # Calculate the total savings for the population that adopts the intervention
-    total_savings = savings_per_person * population
-
-    return total_savings
-
 def calculate_consumer_revenue(start_year, year, penetration_rate, peak_time, total_older_adults, list_price, annual_inflation):
     # Calculate the adoption multiplier for the given year
     adopt_mult = adoption_multiplier(year - start_year, penetration_rate, peak_time)
+    print(f"Adoption Multiplier: {adopt_mult}")
 
     # Calculate the consumer revenue based on list price, adoption multiplier, and consumer penetration rate
-    consumer_revenue = total_older_adults * adopt_mult * list_price
+    consumer_revenue = total_older_adults * adopt_mult * list_price * 12
+    print(f"Consumer Revenue (before inflation adjustment): {consumer_revenue}")
 
     # Adjust for inflation
     inflation_adjustment = (1 + annual_inflation) ** (year - start_year)
+    print(f"Inflation Adjustment: {inflation_adjustment}")
+
     consumer_revenue /= inflation_adjustment
+    print(f"Consumer Revenue (after inflation adjustment): {consumer_revenue}")
 
     return consumer_revenue
 
@@ -158,36 +126,47 @@ def main():
         plot_size = st.slider('Plot Size', min_value=0.1, max_value=15.0, value=5.0, key='plot_size')
         plot_total = st.checkbox('Plot Total Spending', value=True, key='plot_total')
         diseases = st.multiselect('Diseases with Reduced Spending Burden', options=list_of_diseases, default=list_of_diseases, key='diseases')
+        #[SRR]
         reduction_rate = st.number_input('Spending Reduction Rate for All Disease (for payers)', min_value=0.0, max_value=1.0, value=0.2, key='reduction_rate')
+        #[CW]
         consumer_percentage = st.slider('Consumer Revenue as Percentage of Total Revenue', min_value=0.0, max_value=1.0, value=0.5, key='percentage')
+        #[PW]
         spending_percentage = 1 - consumer_percentage
-        list_price = st.number_input('Consumer Aging Drug List Price ($)', min_value=0, value=618, key='list_price')
-        penetration_rate = st.slider('Consumer Penetration Rate at Peak Adoption', min_value=0.0, max_value=1.0, value=0.25, key='penetration_rate')
-        total_older_adults = st.number_input('Total Older Adults', min_value=0, value=55000000, key='total_older_adults')
-        discount = st.number_input('Discount for Payers (Medicare/PBMs)', min_value=0.0, max_value=1.0, value=0.55, key='discount')
-        discounts = {'PBMs': discount}
-        patent_duration = st.slider('Years of Patent Exclusivity', min_value=0, max_value=30, value=15, key='patent_duration')
-        annual_inflation = st.slider('Annual Inflation Rate', min_value=0.0, max_value=0.1, value=0.025, key='annual_inflation')
-        start_year = st.slider('Start Year', min_value=2023, max_value=2050, value=2030, key='start_year')
-        peak_time = st.slider('Years Until Peak Revenue', min_value=0, max_value=10, value=5, key='peak_time')
+        #[LP]
+        list_price = st.number_input('Consumer Aging Drug List Price ($)', min_value=0, value=default_list_price, key='list_price')
+        #[MPCR]
+        penetration_rate = st.slider('Consumer Penetration Rate at Peak Adoption', min_value=0.0, max_value=1.0, value=default_penetration_rate, key='penetration_rate')
+        #[TNOA]
+        total_older_adults = st.number_input('Total Older Adults', min_value=0, value=default_total_older_adults, key='total_older_adults')
+        #[DPE]
+        patent_duration = st.slider('Years of Patent Exclusivity', min_value=0, max_value=30, value=default_patent_duration, key='patent_duration')
+        #[AIR]
+        annual_inflation = st.slider('Annual Inflation Rate', min_value=0.0, max_value=0.1, value=default_annual_inflation, key='annual_inflation')
+        #[SY]
+        start_year = st.slider('Start Year', min_value=2023, max_value=2050, value=default_start_year, key='start_year')
+        #[YMP]
+        peak_time = st.slider('Years Until Peak Revenue', min_value=0, max_value=10, value=default_peak_time, key='peak_time')
 
     # Define extended_years here, after the sliders
     end_year = start_year + patent_duration
     extended_years = list(range(start_year, end_year + 1))
 
     # Adjusted parameters
-    adjusted_peak_time = peak_time 
+    peak_time 
 
     # Load the data
     data_path = '/Users/alexkesin/adjusted_spending_data.csv'
     
     spending_data = pd.read_csv(data_path)
 
+    #the csv is arranged via spending per state so im trying to get rid of that here
     state_rows = spending_data['State'].notna() & ~spending_data['State'].str.contains("Total|Average|spending", na=False, case=False)
    
+    #annoying rows from my csv that i had to purge
     suspicious_rows = spending_data[~state_rows]
     print(suspicious_rows)
    
+    #le spending
     spending_data = spending_data[state_rows]
 
     # Calculate total spending per condition
@@ -218,7 +197,7 @@ def main():
         yearly_spending = 0
         for state in spending_data['State']:
             for condition in diseases:
-                spending = calculate_spending(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
+                spending = calculate_spending(start_year, year, state, condition, peak_time, reduction_rate, total_older_adults, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
                 yearly_spending += spending
         total_spendings.append(yearly_spending)
 
@@ -273,7 +252,7 @@ def main():
         for year in extended_years:
             yearly_spending = 0
             for state in spending_data['State']:
-                spending = calculate_spending(start_year, year, state, condition, adjusted_peak_time, reduction_rate, total_older_adults, discounts, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
+                spending = calculate_spending(start_year, year, state, condition, peak_time, reduction_rate, total_older_adults, annual_inflation, spending_data, total_spending_per_condition, total_spending_all_conditions, population_data)
                 yearly_spending += spending
             individual_spendings.append(yearly_spending / 1e9)  # Convert to billions
         # In your plot functions, use the linewidth parameter to set the thickness of the lines
